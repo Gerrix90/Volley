@@ -2,6 +2,8 @@ package com.aaa.gerrix.volleycache.ui;
 
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,7 +13,6 @@ import android.widget.TextView;
 
 import com.aaa.gerrix.volleycache.R;
 import com.aaa.gerrix.volleycache.model.Lost;
-import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
 
@@ -37,13 +38,19 @@ public class LostAdapter extends RecyclerView.Adapter<LostAdapter.DataObjectHold
 
         holder.title.setText(mDataset.get(position).getTitle());
         holder.body.setText(String.valueOf(mDataset.get(position).getId()));
-        Glide
-                .with(context)
-                .load(mDataset.get(position).getImage())
-                .centerCrop()
-                .placeholder(R.mipmap.ic_launcher)
-                .crossFade()
-                .into(holder.image);
+
+        byte[] imageData = mDataset.get(position).getImage().getBlob();
+        Bitmap image = BitmapFactory.decodeByteArray(imageData, 0, imageData.length);
+        holder.image.setImageBitmap(image);
+//        Glide
+//                .with(context)
+//                .load(mDataset.get(position).getImage())
+//                .centerCrop()
+//                .placeholder(R.mipmap.ic_launcher)
+//                .crossFade()
+//                .into(holder.image);
+
+
 
     }
 

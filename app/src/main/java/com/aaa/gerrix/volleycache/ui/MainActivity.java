@@ -1,6 +1,11 @@
 package com.aaa.gerrix.volleycache.ui;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
+import android.support.annotation.RequiresApi;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
@@ -9,38 +14,76 @@ import android.util.Log;
 
 import com.aaa.gerrix.volleycache.R;
 import com.aaa.gerrix.volleycache.model.Lost;
-import com.android.volley.Cache;
-import com.android.volley.NetworkResponse;
-import com.android.volley.ParseError;
 import com.android.volley.Request.Method;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
-import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.raizlabs.android.dbflow.data.Blob;
+import com.raizlabs.android.dbflow.sql.language.Delete;
+import com.raizlabs.android.dbflow.sql.language.SQLite;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.UnsupportedEncodingException;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private List<Lost> lostList = new ArrayList<>();
+    private List<Lost> lostList;
     private RecyclerView recyclerView;
     private LostAdapter mAdapter;
-    private ArrayList<Lost> posts;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        lostList = new ArrayList<>();
+
         initUi();
-        loadLost();
+
+        if (!isInternetConnected(this)){
+
+            Thread thread = new Thread(){
+                public void run(){
+                    for (int i = 0; i < getPosts().size(); i++) {
+
+                        lostList.add(getPosts().get(i));
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mAdapter.notifyDataSetChanged();
+                            }
+                        });
+                    }
+                }
+            };
+
+            thread.start();
+
+
+
+        }else {
+            Delete.table(Lost.class);
+            loadLost();
+
+        }
+
+    }
+
+    private List<Lost> getPosts(){
+        List<Lost> organizationList = SQLite.select().
+                from(Lost.class).queryList();
+        Log.i("Provera getPosts", String.valueOf(organizationList.size()));
+
+        return organizationList;
     }
 
     private void initUi(){
@@ -70,33 +113,26 @@ public class MainActivity extends AppCompatActivity {
 
                         JSONObject episode = episodes.getJSONObject(i);
                         String name = episode.getString("name");
-                        Log.i("Provera Object", name);
 
                         JSONObject image = episode.getJSONObject("image");
                         String imageMedium = image.getString("medium");
-                        Log.i("Provera Object", String.valueOf(imageMedium));
 
                         int id = episode.getInt("id");
-                        Log.i("Provera Object", String.valueOf(id));
 
                         String url = episode.getString("url");
-                        Log.i("Provera Object", url);
 
                         int season = episode.getInt("season");
-                        Log.i("Provera Object", String.valueOf(season));
 
-                        Lost lostItem = new Lost(
-                                name,
-                                imageMedium,
-                                id
-                        );
-
-                        lostList.add(lostItem);
-                        mAdapter.notifyDataSetChanged();
-
-
-
-
+                        try {
+                            URL urlImage = new URL(imageMedium);
+                            (new Thread(new Downlaoder(
+                                    id,
+                                    name,
+                                    urlImage
+                            ))).start();
+                        } catch (MalformedURLException e) {
+                            e.printStackTrace();
+                        }
 
 
                     }
@@ -112,58 +148,77 @@ public class MainActivity extends AppCompatActivity {
             public void onErrorResponse(VolleyError error) {
 
             }
-        }){
-            @Override
-            protected Response<JSONObject> parseNetworkResponse(NetworkResponse response) {
-                try {
-                    Cache.Entry cacheEntry = HttpHeaderParser.parseCacheHeaders(response);
-                    if (cacheEntry == null) {
-                        cacheEntry = new Cache.Entry();
-                    }
-                    final long cacheHitButRefreshed = 3 * 60 * 1000; // in 3 minutes cache will be hit, but also refreshed on background
-                    final long cacheExpired = 24 * 60 * 60 * 1000; // in 24 hours this cache entry expires completely
-                    long now = System.currentTimeMillis();
-                    final long softExpire = now + cacheHitButRefreshed;
-                    final long ttl = now + cacheExpired;
-                    cacheEntry.data = response.data;
-                    cacheEntry.softTtl = softExpire;
-                    cacheEntry.ttl = ttl;
-                    String headerValue;
-                    headerValue = response.headers.get("Date");
-                    if (headerValue != null) {
-                        cacheEntry.serverDate = HttpHeaderParser.parseDateAsEpoch(headerValue);
-                    }
-                    headerValue = response.headers.get("Last-Modified");
-                    if (headerValue != null) {
-                        cacheEntry.lastModified = HttpHeaderParser.parseDateAsEpoch(headerValue);
-                    }
-                    cacheEntry.responseHeaders = response.headers;
-                    final String jsonString = new String(response.data,
-                            HttpHeaderParser.parseCharset(response.headers));
-                    return Response.success(new JSONObject(jsonString), cacheEntry);
-                } catch (UnsupportedEncodingException e) {
-                    return Response.error(new ParseError(e));
-                } catch (JSONException e) {
-                    return Response.error(new ParseError(e));
-                }
-            }
-
-            @Override
-            protected void deliverResponse(JSONObject response) {
-                super.deliverResponse(response);
-            }
-
-            @Override
-            public void deliverError(VolleyError error) {
-                super.deliverError(error);
-            }
-
-            @Override
-            protected VolleyError parseNetworkError(VolleyError volleyError) {
-                return super.parseNetworkError(volleyError);
-            }
-        };
+        });
 
         Volley.newRequestQueue(this).add(jsonObjReq);
+    }
+
+    public  class Downlaoder implements Runnable{
+        private URL url;
+        private Lost lost;
+        private int id;
+        private String title;
+
+
+
+        Downlaoder(int id, String title,URL url){
+            lost = new Lost();
+            this.url = url;
+            this.id = id;
+            this.title = title;
+
+        }
+        @RequiresApi(api = VERSION_CODES.KITKAT)
+        @Override
+        public void run() {
+            try {
+                byte[] bytes = recoverImageFromUrl(this.url);
+
+                Log.i("Provera run", String.valueOf(recoverImageFromUrl(this.url).length));
+
+                lost.setImage(new Blob(bytes));
+                lost.setTitle(this.title);
+                lost.setId(this.id);
+                lost.save();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+
+
+            lostList.add(lost);
+            Log.i("Provera postlist", String.valueOf(lostList.size()));
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mAdapter.notifyDataSetChanged();
+
+                }
+            });
+
+        }
+
+    }
+    @RequiresApi(api = VERSION_CODES.KITKAT)
+    public byte[] recoverImageFromUrl(URL urlText) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        try (InputStream inputStream = urlText.openStream()) {
+            int n = 0;
+            byte [] buffer = new byte[ 1024 ];
+            while (-1 != (n = inputStream.read(buffer))) {
+                output.write(buffer, 0, n);
+            }
+        }
+
+        return output.toByteArray();
+    }
+
+    public static boolean isInternetConnected(Context context) {
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+
+        return activeNetwork != null && activeNetwork.isConnectedOrConnecting();
     }
 }

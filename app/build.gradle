@@ -31,4 +31,8 @@ dependencies {
     compile 'com.android.support:recyclerview-v7:21.0.+'
     compile 'com.github.bumptech.glide:glide:3.7.0'
     compile 'com.android.volley:volley:1.0.0'
+
+    annotationProcessor "com.github.Raizlabs.DBFlow:dbflow-processor:4.0.0-beta5"
+    compile "com.github.Raizlabs.DBFlow:dbflow-core:4.0.0-beta5"
+    compile "com.github.Raizlabs.DBFlow:dbflow:4.0.0-beta5"
 }
