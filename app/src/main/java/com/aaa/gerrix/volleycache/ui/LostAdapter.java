@@ -2,11 +2,14 @@ package com.aaa.gerrix.volleycache.ui;
 
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Bundle;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -34,7 +37,7 @@ public class LostAdapter extends RecyclerView.Adapter<LostAdapter.DataObjectHold
     }
 
     @Override
-    public void onBindViewHolder(DataObjectHolder holder, int position) {
+    public void onBindViewHolder(DataObjectHolder holder, final int position) {
 
         holder.title.setText(mDataset.get(position).getTitle());
         holder.body.setText(String.valueOf(mDataset.get(position).getId()));
@@ -42,6 +45,20 @@ public class LostAdapter extends RecyclerView.Adapter<LostAdapter.DataObjectHold
         byte[] imageData = mDataset.get(position).getImage().getBlob();
         Bitmap image = BitmapFactory.decodeByteArray(imageData, 0, imageData.length);
         holder.image.setImageBitmap(image);
+
+        holder.image.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent = new Intent(view.getContext(), DetailActivity.class);
+                Bundle bundle = new Bundle();
+                bundle.putParcelable("lost",mDataset.get(position));
+                bundle.putByteArray("image", mDataset.get(position).getImage().getBlob());
+                intent.putExtras(bundle);
+                view.getContext().startActivity(intent);
+            }
+        });
+
+
 //        Glide
 //                .with(context)
 //                .load(mDataset.get(position).getImage())
@@ -70,6 +87,7 @@ public class LostAdapter extends RecyclerView.Adapter<LostAdapter.DataObjectHold
             title = (TextView) itemView.findViewById(R.id.title);
             body = (TextView) itemView.findViewById(R.id.id);
             image = (ImageView) itemView.findViewById(R.id.image);
+
         }
     }
 }
